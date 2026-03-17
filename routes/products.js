@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 let productModel = require('../schemas/products');//dbContext
+let inventoryModel = require('../schemas/inventories');
 const { default: slugify } = require('slugify');
 
 /* GET users listing. */
@@ -20,12 +21,6 @@ router.get('/', async function (req, res, next) {
     path:'category',
     select:'name'
   })
-  // result = result.filter(
-  //   function (e) {
-  //     return e.price >= minPrice && e.price <= maxPrice
-  //       && e.title.toLowerCase().includes(titleQ.toLowerCase())
-  //   }
-  // )
   res.send(result);
 });
 
@@ -47,21 +42,35 @@ router.get('/:id', async function (req, res, next) {
 });
 
 router.post('/', async function (req, res, next) {
-  let newProduct = new productModel({
-    title: req.body.title,
-    slug: slugify(req.body.title, {
-      replacement: '-',
-      remove: undefined,
-      lower: true,
-      strict: false,
-    }),
-    price: req.body.price,
-    description: req.body.description,
-    category: req.body.category,
-    images: req.body.images
-  });
-  await newProduct.save();
-  res.send(newProduct)
+  try {
+    let newProduct = new productModel({
+      title: req.body.title,
+      slug: slugify(req.body.title, {
+        replacement: '-',
+        remove: undefined,
+        lower: true,
+        strict: false,
+      }),
+      price: req.body.price,
+      description: req.body.description,
+      category: req.body.category,
+      images: req.body.images
+    });
+    await newProduct.save();
+
+    // Tự động tạo inventory khi tạo product mới
+    let newInventory = new inventoryModel({
+      product: newProduct._id,
+      stock: 0,
+      reserved: 0,
+      soldCount: 0
+    });
+    await newInventory.save();
+
+    res.send({ product: newProduct, inventory: newInventory });
+  } catch (error) {
+    res.status(500).send({ message: error.message });
+  }
 })
 router.put('/:id', async function (req, res, next) {
   try {
